@@ -35,22 +35,26 @@ async function searchGoogle(query, numResults = 2) {
 }
 
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
-const WEB_PORT = process.env.PORT || 3000;
+const WEB_PORT = process.env.PORT || 3000; // Node.js 서버 포트
 const app = express();
+
+app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
 
 // 세션 설정
 app.use(session({
     secret: process.env.SESSION_SECRET || 'solchi-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: { 
-        secure: false, // HTTPS 사용 시 true로 변경
-        maxAge: 24 * 60 * 60 * 1000 // 24시간
+    cookie: {
+        secure: false,
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
@@ -58,15 +62,13 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 사용자 데이터 저장소 (실제로는 데이터베이스 사용 권장)
+// 사용자 데이터 저장소 (메모리, 실제 서비스는 DB 사용 권장)
 const users = new Map();
-const userChats = new Map();
 
 // Passport 직렬화/역직렬화
 passport.serializeUser((user, done) => {
     done(null, user.id);
 });
-
 passport.deserializeUser((id, done) => {
     const user = users.get(id);
     done(null, user);
@@ -78,32 +80,27 @@ passport.use(new GoogleStrategy({
     clientSecret: GOOGLE_CLIENT_SECRET,
     callbackURL: "/auth/google/callback"
 }, (accessToken, refreshToken, profile, done) => {
-    // 사용자 정보 저장
     const user = {
         id: profile.id,
         email: profile.emails[0].value,
         name: profile.displayName,
         picture: profile.photos[0].value
     };
-    
     users.set(profile.id, user);
-    
-    // 새 사용자라면 채팅 히스토리 초기화
-    if (!userChats.has(profile.id)) {
-        userChats.set(profile.id, []);
-    }
-    
     return done(null, user);
 }));
 
-app.use(express.json()); // JSON 파싱 미들웨어 추가
+/* 구글 로그인 라우트
+구글 로그인 시작: /auth/google
+구글 로그인 콜백: /auth/google/callback
+로그아웃: /auth/logout
+*/
 
-// --- 인증 라우트 ---
 // 구글 로그인 시작
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 // 구글 로그인 콜백
-app.get('/auth/google/callback', 
+app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login' }),
     (req, res) => {
         res.redirect('/');
@@ -120,47 +117,49 @@ app.get('/auth/logout', (req, res) => {
     });
 });
 
-// 사용자 정보 API
+// 사용자 정보 API (로그인 여부 확인)
 app.get('/api/user', (req, res) => {
-    if (req.isAuthenticated()) {
-        res.json({ 
-            authenticated: true, 
-            user: req.user 
+    if (req.isAuthenticated && req.isAuthenticated()) {
+        res.json({
+            authenticated: true,
+            user: req.user
         });
     } else {
-        res.json({ 
-            authenticated: false, 
-            user: null 
+        res.json({
+            authenticated: false,
+            user: null
         });
     }
 });
 
+// Java 서버 주소 정의 (예시)
+const JAVA_SERVER = 'http://localhost:8080'; // Java(Spring) 서버 포트
+
 // 사용자 채팅 히스토리 API
-app.get('/api/chats', (req, res) => {
-    if (req.isAuthenticated()) {
-        const userChatsList = userChats.get(req.user.id) || [];
-        res.json({ chats: userChatsList });
-    } else {
+app.get('/api/chats', async (req, res) => {
+    try {
+        // 세션 기반 인증을 Java와 Node가 공유하지 않으므로, 인증이 필요하다면 프론트엔드에서 직접 Java API로 호출하는 것이 더 안전함
+        const auth = req.headers.authorization || '';
+        const response = await axios.get(`${JAVA_SERVER}/api/chats`, {
+            headers: { Authorization: auth },
+            withCredentials: true // 세션 쿠키 전달
+        });
+        res.json(response.data);
+    } catch (e) {
         res.json({ chats: [] });
     }
 });
 
 // 채팅 저장 API
-app.post('/api/save-chat', (req, res) => {
-    if (req.isAuthenticated()) {
-        const { chatId, messages } = req.body;
-        const userChatsList = userChats.get(req.user.id) || [];
-        
-        const existingChatIndex = userChatsList.findIndex(chat => chat.id === chatId);
-        if (existingChatIndex >= 0) {
-            userChatsList[existingChatIndex].messages = messages;
-        } else {
-            userChatsList.push({ id: chatId, messages });
-        }
-        
-        userChats.set(req.user.id, userChatsList);
-        res.json({ success: true });
-    } else {
+app.post('/api/save-chat', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const response = await axios.post(`${JAVA_SERVER}/api/save-chat`, req.body, {
+            headers: { Authorization: auth },
+            withCredentials: true
+        });
+        res.json(response.data);
+    } catch (e) {
         res.status(401).json({ success: false, message: '로그인이 필요합니다.' });
     }
 });
@@ -170,7 +169,7 @@ let genAI = null;
 let model = null;
 if (GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 }
 
 // --- 끝말잇기 단어 리스트 (간단 예시, 실제로는 더 많은 단어를 넣을 수 있음) ---
@@ -339,10 +338,36 @@ You must:
 app.post('/api/search-chat', async (req, res) => {
     try {
         const { message } = req.body;
-        if (!message || typeof message !== 'string' || !model) {
+        if (!message || typeof message !== 'string') {
             return res.status(400).json({ success: false, response: '질문을 이해하지 못했습니다.' });
         }
+        if (!model) {
+            return res.status(500).json({ success: false, response: 'AI 모델이 준비되지 않았습니다. API 키를 확인하세요.' });
+        }
+
         let msg = message.trim();
+        const userId = getUserId(req);
+        let userContext = userContextMap.get(userId) || {};
+
+        // --- 프로그램 생성 요청 컨텍스트 추적 (대화 이어주기) ---
+        // 1. "프로그램을 만들어줘" 또는 유사 요청 감지
+        if (/프로그램.*만들.*줘|앱.*만들.*줘|어플.*만들.*줘|application.*make|create.*program/i.test(msg)) {
+            userContext.lastRequest = 'program_request';
+            userContextMap.set(userId, userContext);
+            return res.json({ success: true, response: '어떤 프로그램을 만들어드릴까요? 예: 계산기, 메모장, 일정관리 등' });
+        }
+
+        // 2. 직전 요청이 프로그램 생성이고, 이번 입력이 단답 또는 문장(예: "메모장", "가계부 만들어줘", "일정관리 앱")일 때
+        if (userContext.lastRequest === 'program_request') {
+            userContext.lastRequest = null; // 컨텍스트 초기화(한 번만 사용)
+            userContextMap.set(userId, userContext);
+
+            // 만약 사용자가 "만들어줘" 없이 단답/문장만 입력하면 자동으로 "프로그램을 만들어줘"로 보강
+            if (!/만들.*줘|만들어|코드|code|구현|작성|app|program|application/i.test(msg)) {
+                msg = `${msg.trim()} 프로그램을 만들어줘`;
+            }
+            // 만약 이미 "만들어줘" 등이 포함되어 있으면 그대로 진행
+        }
 
         // DeepSearch 모드 구분
         let isDeepSearch = false;
@@ -522,4 +547,213 @@ app.listen(WEB_PORT, () => {
 2. node gemini_chatbot.js
 3. 브라우저에서 http://localhost:3000 접속
 */
+
+// 사용자별 간단한 컨텍스트(최근 요청 유형) 저장 (메모리, 실제 서비스는 세션/DB 권장)
+const userContextMap = new Map();
+
+function getUserId(req) {
+    if (req.user && req.user.id) return req.user.id;
+    return req.ip;
+}
+
+// 기존 /api/search-chat 라우트
+app.post('/api/search-chat', async (req, res) => {
+    try {
+        const { message } = req.body;
+        if (!message || typeof message !== 'string') {
+            return res.status(400).json({ success: false, response: '질문을 이해하지 못했습니다.' });
+        }
+        if (!model) {
+            return res.status(500).json({ success: false, response: 'AI 모델이 준비되지 않았습니다. API 키를 확인하세요.' });
+        }
+
+        let msg = message.trim();
+        const userId = getUserId(req);
+        let userContext = userContextMap.get(userId) || {};
+
+        // --- 프로그램 생성 요청 컨텍스트 추적 (대화 이어주기) ---
+        // 1. "프로그램을 만들어줘" 또는 유사 요청 감지
+        if (/프로그램.*만들.*줘|앱.*만들.*줘|어플.*만들.*줘|application.*make|create.*program/i.test(msg)) {
+            userContext.lastRequest = 'program_request';
+            userContextMap.set(userId, userContext);
+            return res.json({ success: true, response: '어떤 프로그램을 만들어드릴까요? 예: 계산기, 메모장, 일정관리 등' });
+        }
+
+        // 2. 직전 요청이 프로그램 생성이고, 이번 입력이 단답 또는 문장(예: "메모장", "가계부 만들어줘", "일정관리 앱")일 때
+        if (userContext.lastRequest === 'program_request') {
+            userContext.lastRequest = null; // 컨텍스트 초기화(한 번만 사용)
+            userContextMap.set(userId, userContext);
+
+            // 만약 사용자가 "만들어줘" 없이 단답/문장만 입력하면 자동으로 "프로그램을 만들어줘"로 보강
+            if (!/만들.*줘|만들어|코드|code|구현|작성|app|program|application/i.test(msg)) {
+                msg = `${msg.trim()} 프로그램을 만들어줘`;
+            }
+            // 만약 이미 "만들어줘" 등이 포함되어 있으면 그대로 진행
+        }
+
+        // DeepSearch 모드 구분
+        let isDeepSearch = false;
+        if (msg.startsWith('[deepsearch]')) {
+            isDeepSearch = true;
+            msg = msg.replace(/^\[deepsearch\]/i, '').trim();
+        }
+
+        // agent.loop 모드 진입/종료 체크
+        if (!isAgentLoopMode && /(agent\.loop|에이전트 루프|agent loop|agent\.run_loop|agent loop start|에이전트 루프 시작)/i.test(msg)) {
+            isAgentLoopMode = true;
+            return res.json({ success: true, response: '에이전트 루프 모드에 진입했습니다! 반복적으로 질문을 입력해보세요. "그만", "종료", "끝"을 입력하면 루프가 종료됩니다.' });
+        }
+        if (isAgentLoopMode && /(그만|종료|끝|stop|exit|quit)/i.test(msg)) {
+            isAgentLoopMode = false;
+            return res.json({ success: true, response: '에이전트 루프를 종료합니다. 일반 대화로 돌아갑니다.' });
+        }
+
+        // agent.loop 모드일 때: 반복적으로 질의-응답, 단계별 안내, 도구 활용
+        if (isAgentLoopMode) {
+            const searchResults = await searchGoogle(msg, 2);
+            let searchContext = '';
+            if (searchResults.length > 0) {
+                searchContext = searchResults.map(
+                    r => `제목: ${r.title}\n링크: ${r.link}\n내용: ${r.snippet}`
+                ).join('\n---\n');
+            }
+            let prompt = msg;
+            if (searchContext) {
+                prompt = `다음은 "${msg}"에 대한 구글 검색 결과입니다:\n${searchContext}\n\n이 정보를 참고해서 답변해줘.`;
+            }
+            prompt = enhancePromptForCoding(msg, prompt);
+
+            const chat = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: AGENT_LOOP_SYSTEM_PROMPT }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: '에이전트 루프 모드입니다! 무엇이든 물어보세요.' }]
+                    }
+                ]
+            });
+            const result = await chat.sendMessage(prompt);
+            const response = await result.response;
+            const rawText = response.text();
+            const processedText = processCodeBlocks(rawText);
+            const markdownProcessed = processMarkdown(processedText);
+            const formatted = markdownProcessed.replace(/\n/g, '<br>');
+            return res.json({ success: true, response: formatted });
+        }
+
+        // 끝말잇기 모드 진입/종료 체크
+        if (!isWordChainMode && /(끝말잇기|끝말잇기하자|끝말잇기 시작)/.test(msg)) {
+            isWordChainMode = true;
+            lastWord = null;
+            return res.json({ success: true, response: '끝말잇기 게임을 시작합니다! 먼저 단어를 말씀해 주세요.' });
+        }
+        if (isWordChainMode && /(그만|끝|종료|그만할래|그만하자)/.test(msg)) {
+            isWordChainMode = false;
+            lastWord = null;
+            return res.json({ success: true, response: '끝말잇기를 종료합니다! 다른 질문도 언제든 환영이에요 😊' });
+        }
+
+        // 끝말잇기 모드일 때
+        if (isWordChainMode) {
+            // 첫 단어라면 AI가 이어서 단어 제시
+            if (!lastWord) {
+                lastWord = msg;
+                const next = getNextWord(msg);
+                if (next) {
+                    lastWord = next;
+                    return res.json({ success: true, response: `좋아요! "${msg}" 다음은 "${next}" 입니다. 이제 당신 차례예요!` });
+                } else {
+                    isWordChainMode = false;
+                    return res.json({ success: true, response: `앗, "${msg}"로 시작하는 단어를 못 찾겠어요. 끝말잇기를 종료합니다!` });
+                }
+            } else {
+                // 사용자가 올바른 단어를 냈는지 체크(마지막 글자 일치)
+                const expectedChar = lastWord.slice(-1);
+                if (!msg.startsWith(expectedChar)) {
+                    return res.json({ success: true, response: `끝말잇기는 "${expectedChar}"로 시작해야 해요! 다시 시도해 주세요.` });
+                }
+                // AI가 이어서 단어 제시
+                const next = getNextWord(msg);
+                if (next) {
+                    lastWord = next;
+                    return res.json({ success: true, response: `"${msg}" 다음은 "${next}"! 이제 당신 차례예요!` });
+                } else {
+                    isWordChainMode = false;
+                    return res.json({ success: true, response: `오, "${msg}"로 시작하는 단어를 못 찾겠어요. 제가 졌어요! 끝말잇기를 종료합니다.` });
+                }
+            }
+        }
+
+        // DeepSearch/일반 답변 분기
+        if (isDeepSearch) {
+            // DeepSearch: 검색 결과를 많이 활용, 풍부한 설명
+            const numResults = 5;
+            const searchResults = await searchGoogle(msg, numResults);
+            let searchContext = '';
+            if (searchResults.length > 0) {
+                searchContext = searchResults.map(
+                    r => `제목: ${r.title}\n링크: ${r.link}\n내용: ${r.snippet}`
+                ).join('\n---\n');
+            }
+            let prompt = msg;
+            if (searchContext) {
+                prompt = `다음은 "${msg}"에 대한 구글 검색 결과입니다:\n${searchContext}\n\n이 정보를 참고해서 질문이 단순 인사말이나 대화여도, 관련된 의미, 문화, 다양한 표현 등까지 포함해 최대한 깊이 있고, 상세하게 답변해줘.`;
+            }
+            prompt = enhancePromptForCoding(msg, prompt);
+            const chat = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: MANUS_SYSTEM_PROMPT }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: '안녕하세요! 무엇을 도와드릴까요?' }]
+                    }
+                ]
+            });
+            const result = await chat.sendMessage(prompt);
+            const response = await result.response;
+            const rawText = response.text();
+            const processedText = processCodeBlocks(rawText);
+            const markdownProcessed = processMarkdown(processedText);
+            const formatted = markdownProcessed.replace(/\n/g, '<br>');
+            return res.json({ success: true, response: formatted });
+        } else {
+            // 일반 대화: 검색 결과 없이 간단한 대화형 챗봇 답변
+            const chat = model.startChat({
+                history: [
+                    {
+                        role: 'user',
+                        parts: [{ text: MANUS_SYSTEM_PROMPT }]
+                    },
+                    {
+                        role: 'model',
+                        parts: [{ text: '안녕하세요! 무엇을 도와드릴까요?' }]
+                    }
+                ]
+            });
+            const result = await chat.sendMessage(msg);
+            const response = await result.response;
+            const rawText = response.text();
+            const processedText = processCodeBlocks(rawText);
+            const markdownProcessed = processMarkdown(processedText);
+            const formatted = markdownProcessed.replace(/\n/g, '<br>');
+            return res.json({ success: true, response: formatted });
+        }
+    } catch (e) {
+        console.error('API 오류:', e.message);
+        res.status(500).json({ success: false, response: 'AI 응답 생성 중 오류가 발생했습니다.' });
+    }
+});
+
+// /search-chat 경로도 동일하게 처리 (프론트엔드 호환용)
+app.post('/search-chat', async (req, res) => {
+    // /api/search-chat 핸들러 재사용
+    req.url = '/api/search-chat';
+    app._router.handle(req, res);
+});
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solchi - Gaming AI Assistant</title>
+    <title>Solchi - AI Assistant</title>
     <!-- Prism.js for syntax highlighting -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
@@ -334,6 +334,37 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .chat-delete-btn {
+            display: none;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            z-index: 2;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .chat-item:hover .chat-delete-btn {
+            display: block;
+            opacity: 1;
+        }
+
+        .chat-delete-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: #ff0080;
+            transition: fill 0.2s;
+        }
+
+        .chat-delete-btn:hover svg {
+            fill: #ff3333;
         }
 
         /* 메인 채팅 영역 */
@@ -952,6 +983,8 @@
             100% { transform: translateX(100%); opacity: 0; }
         }
     </style>
+    <!-- 사이트 아이콘(파비콘) 추가: S 로고 SVG -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><defs><radialGradient id='g' cx='50%' cy='50%' r='70%'><stop offset='0%' stop-color='%23ff0080'/><stop offset='60%' stop-color='%238000ff'/><stop offset='100%' stop-color='%2300ffff'/></radialGradient></defs><circle cx='32' cy='32' r='30' fill='url(%23g)'/><text x='50%' y='54%' text-anchor='middle' font-family='Orbitron,Arial,sans-serif' font-size='36' font-weight='900' fill='white' dy='.1em'>S</text></svg>">
 </head>
 <body>
     <!-- 배경 애니메이션 -->
@@ -964,7 +997,7 @@
             <div class="main-logo">S</div>
         </div>
         <div class="cinematic-title">SOLCHI</div>
-        <div class="cinematic-subtitle">Gaming AI Assistant</div>
+        <div class="cinematic-subtitle">AI Assistant</div>
     </div>
 
     <div class="main-container">
@@ -980,8 +1013,14 @@
                 <!-- 로그인하지 않은 상태 -->
                 <div id="guestUser" style="display: block;">
                     <button class="login-btn" id="loginBtn">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        <!-- Google 로고 SVG로 교체 -->
+                        <svg width="18" height="18" viewBox="0 0 48 48">
+                            <g>
+                                <path fill="#4285F4" d="M43.6 20.5h-1.9V20H24v8h11.3c-1.6 4.3-5.7 7.5-11.3 7.5-6.6 0-12-5.4-12-12s5.4-12 12-12c2.7 0 5.2.9 7.2 2.5l6-6C36.1 5.1 30.4 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.6 20-21 0-1.4-.1-2.7-.4-4z"/>
+                                <path fill="#34A853" d="M6.3 14.7l6.6 4.8C14.5 16.1 18.9 13 24 13c2.7 0 5.2.9 7.2 2.5l6-6C36.1 5.1 30.4 3 24 3 16.1 3 9.1 7.8 6.3 14.7z"/>
+                                <path fill="#FBBC05" d="M24 45c6.2 0 11.4-2 15.2-5.5l-7-5.7C29.7 35.7 27 36.5 24 36.5c-5.6 0-10.3-3.8-12-9l-7.1 5.5C9.1 40.2 16.1 45 24 45z"/>
+                                <path fill="#EA4335" d="M43.6 20.5h-1.9V20H24v8h11.3c-1.1 3-3.5 5.4-6.3 6.8l7 5.7C41.9 37.3 45 31.5 45 24c0-1.4-.1-2.7-.4-4z"/>
+                            </g>
                         </svg>
                         구글로 로그인
                     </button>
@@ -1020,7 +1059,7 @@
             <div class="header">
                 <h1>
                     <div class="header-logo">S</div>
-                    SOLCHI GAMING AI
+                    SOLCHI AI
                 </h1>
             </div>
 
@@ -1074,6 +1113,8 @@
     </div>
 
     <script>
+        const API_BASE_URL = '';
+
         // 전역 변수
         let chatContainer;
         let messageInput;
@@ -1093,10 +1134,6 @@
                 ]
             }
         };
-
-        // Hugging Face API 설정
-        const HUGGINGFACE_API_KEY = 'YOUR_API_KEY_HERE';
-        const API_URL = 'https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium';
 
         // 게이밍 테마 응답 패턴
         const gamingResponses = {
@@ -1165,6 +1202,90 @@
             }, 4000);
         });
 
+        // 반드시 initializeChat 위에 위치
+        function loadChat(chatId) {
+            const chat = chats[chatId];
+            if (!chat) return;
+            chatContainer.innerHTML = '';
+            chat.messages.forEach(message => {
+                addMessageToUI(message.content, message.type);
+            });
+        }
+
+        function switchToChat(chatId) {
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('data-chat-id') == chatId) {
+                    item.classList.add('active');
+                }
+            });
+            currentChatId = chatId;
+            loadChat(chatId);
+        }
+
+        // sendMessage 함수도 initializeChat 위에 있어야 함
+        async function sendMessage() {
+            const query = messageInput.value.trim();
+            if (!query) return;
+
+            addMessageToUI(query, 'user');
+            messageInput.value = '';
+            showTypingIndicator();
+            sendButton.disabled = true;
+
+            // Gemini API는 서버에서 호출, 프론트엔드는 /api/search-chat만 사용
+            try {
+                const response = await fetch('/api/search-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: query })
+                });
+                let aiResponse;
+                if (response.ok) {
+                    const data = await response.json();
+                    aiResponse = data.response || getRandomGamingFallback();
+                } else {
+                    aiResponse = getRandomGamingFallback();
+                }
+                hideTypingIndicator();
+                chats[currentChatId].messages.push({
+                    content: aiResponse,
+                    type: "assistant"
+                });
+                addMessageToUI(aiResponse, 'assistant');
+            } catch (error) {
+                hideTypingIndicator();
+                addMessageToUI('AI 응답 생성 중 오류가 발생했습니다.', 'assistant');
+            }
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+
+        // addMessageToUI 함수 정의 (반드시 loadChat, sendMessage 등에서 사용 전에 위치)
+        function addMessageToUI(content, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = type === 'user' ? 'U' : 'S';
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.innerHTML = content;
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(messageContent);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            if (typingIndicator) typingIndicator.style.display = 'block';
+            if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            if (typingIndicator) typingIndicator.style.display = 'none';
+        }
+
         function initializeChat() {
             chatContainer = document.getElementById('chatContainer');
             messageInput = document.getElementById('messageInput');
@@ -1214,7 +1335,8 @@
                         body: JSON.stringify({
                             message: '[deepsearch] ' + query,
                             chat_id: currentChatId
-                        })
+                        }),
+                        credentials: 'include' // 세션/쿠키 인증을 위해 추가
                     }).then(async response => {
                         let aiResponse;
                         if (response.ok) {
@@ -1292,341 +1414,55 @@
             chatItem.innerHTML = `
                 <div class="chat-title">${title}</div>
                 <div class="chat-preview">${preview}</div>
+                <button class="chat-delete-btn" title="채팅 삭제">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M3 6h18M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+                    </svg>
+                </button>
             `;
-            
-            chatItem.addEventListener('click', () => switchToChat(chatId));
+
+            chatItem.addEventListener('click', (e) => {
+                // 문법 오류 수정: 괄호 추가
+                if (e.target.closest('.chat-delete-btn')) return;
+                switchToChat(chatId);
+            });
+
+            // 삭제 버튼 이벤트
+            const deleteBtn = chatItem.querySelector('.chat-delete-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteChat(chatId, chatItem);
+            });
+
             chatList.appendChild(chatItem);
         }
 
-        function switchToChat(chatId) {
-            // 현재 활성 채팅 표시 업데이트
-            document.querySelectorAll('.chat-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.getAttribute('data-chat-id') == chatId) {
-                    item.classList.add('active');
-                }
-            });
-
-            currentChatId = chatId;
-            loadChat(chatId);
-        }
-
-        function loadChat(chatId) {
-            const chat = chats[chatId];
-            if (!chat) return;
-
-            // 채팅 컨테이너 클리어
-            chatContainer.innerHTML = '';
-
-            // 메시지 로드
-            chat.messages.forEach(message => {
-                addMessageToUI(message.content, message.type);
+        function updateChatList() {
+            chatList.innerHTML = '';
+            Object.values(chats).forEach(chat => {
+                addChatToList(chat.id, chat.title, chat.messages[chat.messages.length - 1]?.content || '');
             });
         }
 
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
-
-            // 현재 채팅에 메시지 추가
-            chats[currentChatId].messages.push({
-                content: message,
-                type: "user"
-            });
-
-            // UI에 메시지 추가
-            addMessageToUI(message, 'user');
-            messageInput.value = '';
-            sendButton.disabled = true;
-
-            // 채팅 목록 업데이트
-            updateChatPreview(currentChatId, message);
-
-            // 타이핑 인디케이터 표시
-            showTypingIndicator();
-
+        function loadChatHistory() {
             try {
-                // 실제 백엔드 API 호출
-                const response = await fetch(API_BASE_URL + '/search-chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: message,
-                        chat_id: currentChatId
-                    })
-                });
-                let aiResponse;
-                if (response.ok) {
-                    const data = await response.json();
-                    aiResponse = data.response || getRandomGamingFallback();
-                } else {
-                    aiResponse = getRandomGamingFallback();
-                }
-                hideTypingIndicator();
-
-                // 응답을 채팅과 UI에 추가
-                chats[currentChatId].messages.push({
-                    content: aiResponse,
-                    type: "assistant"
-                });
-                addMessageToUI(aiResponse, 'assistant');
-
-                // 채팅 제목 업데이트 (첫 번째 메시지인 경우)
-                if (chats[currentChatId].messages.length === 3) {
-                    updateChatTitle(currentChatId, message);
-                }
-
-                // 로그인한 사용자라면 서버에 채팅 저장
-                const userResponse = await fetch('/api/user');
-                const userData = await userResponse.json();
-                if (userData.authenticated) {
-                    saveChatToServer(currentChatId, chats[currentChatId].messages);
-                }
-
-            } catch (error) {
-                hideTypingIndicator();
-                const fallbackResponse = getRandomGamingFallback();
-                chats[currentChatId].messages.push({
-                    content: fallbackResponse,
-                    type: "assistant"
-                });
-                addMessageToUI(fallbackResponse, 'assistant');
-            }
-
-            sendButton.disabled = false;
-            messageInput.focus();
-        }
-
-        function addMessageToUI(content, type) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.textContent = type === 'user' ? 'U' : 'S';
-            
-            const messageContent = document.createElement('div');
-            messageContent.className = 'message-content';
-            // 줄바꿈이 <br>로 들어오므로 innerHTML 사용
-            messageContent.innerHTML = content;
-            
-            messageDiv.appendChild(avatar);
-            messageDiv.appendChild(messageContent);
-            
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function updateChatPreview(chatId, message) {
-            const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
-            if (chatItem) {
-                const preview = chatItem.querySelector('.chat-preview');
-                preview.textContent = message.length > 30 ? message.substring(0, 30) + '...' : message;
-            }
-        }
-
-        function updateChatTitle(chatId, firstMessage) {
-            const title = firstMessage.length > 20 ? firstMessage.substring(0, 20) + '...' : firstMessage;
-            chats[chatId].title = title;
-            
-            const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
-            if (chatItem) {
-                const titleElement = chatItem.querySelector('.chat-title');
-                titleElement.textContent = title;
-            }
-        }
-
-        function showTypingIndicator() {
-            typingIndicator.style.display = 'block';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function hideTypingIndicator() {
-            typingIndicator.style.display = 'none';
-        }
-
-        async function generateGamingResponse(message) {
-            // 먼저 게이밍 테마 응답 체크
-            const gamingResponse = getGamingResponse(message);
-            if (gamingResponse !== null) {
-                return gamingResponse;
-            }
-
-            // Hugging Face API 호출 (실제 API 키가 있을 때만)
-            if (HUGGINGFACE_API_KEY !== 'YOUR_API_KEY_HERE') {
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            inputs: message,
-                            parameters: {
-                                max_length: 100,
-                                temperature: 0.7,
-                                do_sample: true
-                            }
-                        }),
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        return data[0]?.generated_text || getRandomGamingFallback();
+                const savedChats = localStorage.getItem('solchi_chat_history');
+                const savedCurrentChat = localStorage.getItem('solchi_current_chat');
+                if (savedChats) {
+                    chats = JSON.parse(savedChats);
+                    if (savedCurrentChat && chats[savedCurrentChat]) {
+                        currentChatId = savedCurrentChat;
                     }
-                } catch (error) {
-                    console.error('API Error:', error);
-                }
-            }
-
-            return getRandomGamingFallback();
-        }
-
-        function getGamingResponse(message) {
-            const lowerMessage = message.toLowerCase().trim();
-            
-            // 인사말 체크
-            if (lowerMessage.includes('안녕') || lowerMessage.includes('반가') || lowerMessage.includes('hello')) {
-                return getRandomFromArray(gamingResponses.greetings);
-            }
-            
-            // 게이밍 키워드 체크
-            for (const [key, response] of Object.entries(gamingResponses.gaming)) {
-                if (lowerMessage.includes(key)) {
-                    return response;
-                }
-            }
-            
-            // 기본 질문 체크
-            for (const [key, response] of Object.entries(gamingResponses.questions)) {
-                if (lowerMessage.includes(key) || lowerMessage.endsWith(key)) {
-                    return response;
-                }
-            }
-            
-            // "가 뭐야?" 패턴 체크
-            const whatPattern = /(.+)\s*가?\s*뭐야\??$/;
-            const match = lowerMessage.match(whatPattern);
-            if (match) {
-                const subject = match[1].trim();
-                if (subject.includes('게임') || subject.includes('fps') || subject.includes('rpg')) {
-                    return `🎮 ${subject}에 대해 궁금하시군요! ${subject}는 게이밍 세계에서 정말 중요한 요소죠. 더 구체적으로 어떤 부분이 궁금하신가요?`;
-                }
-                return `🤔 ${subject}에 대해 궁금하시군요! ${subject}는 다양한 의미를 가질 수 있어요. 게임과 관련된 내용이라면 더 자세히 설명해주세요!`;
-            }
-            
-            return null;
-        }
-
-        function getRandomGamingFallback() {
-            return getRandomFromArray(gamingResponses.fallback);
-        }
-
-        function getRandomFromArray(array) {
-            return array[Math.floor(Math.random() * array.length)];
-        }
-
-        // 페이지 로드 완료 후 포커스 설정
-        window.addEventListener('load', function() {
-            loadChatHistory();
-            checkUserAuth();
-            setTimeout(() => {
-                if (messageInput) {
-                    messageInput.focus();
-                }
-            }, 4500);
-        });
-
-        // 사용자 인증 상태 확인
-        async function checkUserAuth() {
-            try {
-                const response = await fetch('/api/user');
-                const data = await response.json();
-                
-                if (data.authenticated) {
-                    showLoggedInUser(data.user);
-                    loadUserChats();
-                } else {
-                    showGuestUser();
-                }
-            } catch (error) {
-                console.error('인증 상태 확인 실패:', error);
-                showGuestUser();
-            }
-        }
-
-        // 로그인한 사용자 UI 표시
-        function showLoggedInUser(user) {
-            document.getElementById('guestUser').style.display = 'none';
-            document.getElementById('loggedInUser').style.display = 'block';
-            
-            // 사용자 정보 설정
-            document.getElementById('userName').textContent = user.name;
-            document.getElementById('userEmail').textContent = user.email;
-            
-            if (user.picture) {
-                const avatar = document.getElementById('userAvatar');
-                avatar.innerHTML = `<img src="${user.picture}" alt="${user.name}">`;
-            } else {
-                document.getElementById('userInitial').textContent = user.name.charAt(0).toUpperCase();
-            }
-        }
-
-        // 게스트 사용자 UI 표시
-        function showGuestUser() {
-            document.getElementById('guestUser').style.display = 'block';
-            document.getElementById('loggedInUser').style.display = 'none';
-        }
-
-        // 사용자 채팅 히스토리 로드
-        async function loadUserChats() {
-            try {
-                const response = await fetch('/api/chats');
-                const data = await response.json();
-                
-                if (data.chats && data.chats.length > 0) {
-                    // 서버의 채팅 히스토리로 로컬 채팅 덮어쓰기
-                    chats = {};
-                    data.chats.forEach(chat => {
-                        chats[chat.id] = {
-                            id: chat.id,
-                            title: chat.messages[0]?.content?.substring(0, 20) + '...' || '새 채팅',
-                            messages: chat.messages
-                        };
-                    });
-                    
-                    updateChatList();
-                    
-                    // 첫 번째 채팅 로드
-                    const firstChatId = Object.keys(chats)[0];
-                    if (firstChatId) {
-                        currentChatId = firstChatId;
-                        loadChat(firstChatId);
+                    updateChatList(); // 반드시 호출
+                    if (currentChatId && chats[currentChatId]) {
+                        loadChat(currentChatId);
                     }
+                } else {
+                    updateChatList(); // 기본 채팅 리스트도 초기화
                 }
             } catch (error) {
-                console.error('사용자 채팅 로드 실패:', error);
-            }
-        }
-
-        // 채팅 저장 (로그인한 사용자용)
-        async function saveChatToServer(chatId, messages) {
-            try {
-                await fetch('/api/save-chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        chatId: chatId,
-                        messages: messages
-                    })
-                });
-            } catch (error) {
-                console.error('채팅 저장 실패:', error);
+                console.error('채팅 히스토리 로드 실패:', error);
+                updateChatList();
             }
         }
 
