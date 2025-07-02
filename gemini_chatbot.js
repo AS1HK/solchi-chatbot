@@ -9,6 +9,7 @@ const GOOGLE_API_KEY = process.env.GOOGLE_SEARCH_API_KEY;
 const GOOGLE_CX = process.env.GOOGLE_SEARCH_ENGINE_ID;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || "https://solchi.onrender.com/auth/google/callback";
 
 async function searchGoogle(query, numResults = 2) {
     if (!GOOGLE_API_KEY || !GOOGLE_CX) {
@@ -78,7 +79,7 @@ passport.deserializeUser((id, done) => {
 passport.use(new GoogleStrategy({
     clientID: GOOGLE_CLIENT_ID,
     clientSecret: GOOGLE_CLIENT_SECRET,
-    callbackURL: "/auth/google/callback"
+    callbackURL: GOOGLE_CALLBACK_URL
 }, (accessToken, refreshToken, profile, done) => {
     const user = {
         id: profile.id,
