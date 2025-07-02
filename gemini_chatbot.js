@@ -81,11 +81,14 @@ passport.use(new GoogleStrategy({
     clientSecret: GOOGLE_CLIENT_SECRET,
     callbackURL: GOOGLE_CALLBACK_URL
 }, (accessToken, refreshToken, profile, done) => {
+    // 안전하게 값 추출 (없으면 기본값)
+    const email = (profile.emails && profile.emails[0] && profile.emails[0].value) ? profile.emails[0].value : '';
+    const picture = (profile.photos && profile.photos[0] && profile.photos[0].value) ? profile.photos[0].value : '';
     const user = {
         id: profile.id,
-        email: profile.emails[0].value,
-        name: profile.displayName,
-        picture: profile.photos[0].value
+        email,
+        name: profile.displayName || '',
+        picture
     };
     users.set(profile.id, user);
     return done(null, user);
