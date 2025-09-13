@@ -22,11 +22,11 @@ node gemini_chatbot.js
 - `api.env`: Gemini API, Google Search API 키
 - `id.env`: Google OAuth 클라이언트 ID/Secret
 
-## 🌐 배포
+## 🌐 서버 개설
 
-### Railway 배포
+### https://render.com/
 1. GitHub에 코드 업로드
-2. Railway에서 GitHub 연동
+2. Render에서 GitHub 연동
 3. 환경 변수 설정
 4. 자동 배포 완료
 

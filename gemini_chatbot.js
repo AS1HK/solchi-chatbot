@@ -232,9 +232,9 @@ function processMarkdown(text) {
     return text;
 }
 
-// --- 코드블록 처리 함수 ---
+// 코드블록 처리 함수 
 function processCodeBlocks(text) {
-    // 코드블록 패턴: ```언어명 ... ```
+    // 코드블록 패턴: 언어명 
     const codeBlockPattern = /```(\w+)?\n([\s\S]*?)```/g;
     
     return text.replace(codeBlockPattern, (match, language, code) => {
@@ -265,8 +265,8 @@ function processCodeBlocks(text) {
     });
 }
 
-// --- Gemini 프롬프트 보강 함수 ---
-// 코드 답변 시 항상 코드블록(```언어명 ... ```)을 사용하도록 프롬프트를 강화
+// Gemini 프롬프트 보강 함수 
+// 코드 답변 시 항상 코드블록(언어명)을 사용하도록 프롬프트를 강화
 function enhancePromptForCoding(userMessage, basePrompt) {
     const lower = userMessage.toLowerCase();
     if (codingKeywords.some(kw => lower.includes(kw))) {
